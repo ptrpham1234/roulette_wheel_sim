@@ -17,16 +17,31 @@ savePath = os.path.join(basePath, 'data')
 
 def main():
 
+    data = False
+    games = 100000
+    rounds_per_game = 500
+    start_balance = 300
+    profit_goal = 100
     game_history = []
 
-    for i in range(100):
-        game_history.append(game(rounds=50, start_balance=500))
 
-    # Calculate the percentage of True values
-    true_percentage = (game_history.count(True) / len(game_history)) * 100
 
-    # Print the result
-    print(f"\nThe percentage of True values in the list is: {true_percentage}%")
+    for i in range(games):
+        game_history.append(game(rounds=rounds_per_game, start_balance=start_balance, data=data, goal=profit_goal))
+
+    # Count occurrences
+    counts = {0: game_history.count(0), 1: game_history.count(1), 2: game_history.count(2), 3: game_history.count(3)}
+
+    # Calculate percentages
+    total = len(game_history)
+    percentages = {key: (count / total) * 100 for key, count in counts.items()}
+
+    # Output the report with percentages
+    print("\n\n\nReport with Percentages:")
+    print(f"Lost all of your money (0): {counts[0]} occurrences, {percentages[0]:.2f}%")
+    print(f"Lost some money (1): {counts[1]} occurrences, {percentages[1]:.2f}%")
+    print(f"Gained some profit (2): {counts[2]} occurrences, {percentages[2]:.2f}%")
+    print(f"Met or exceeded your profit goal (3): {counts[3]} occurrences, {percentages[3]:.2f}%")
 
 #############################################################################################################
 # Function:            establishConnection
@@ -36,7 +51,7 @@ def main():
 # Description:
 # Receive the file id to stream from the user and then close the connection
 #############################################################################################################
-def game(rounds=50, start_balance=300):
+def game(rounds=50, start_balance=300, data=False, goal=300):
     if not os.path.exists(savePath):
         os.makedirs(savePath)
         # print("data folder not found. Making one.")
@@ -49,8 +64,9 @@ def game(rounds=50, start_balance=300):
     balance = start_balance
 
     # ! Change this if you want to do different bets
-    bet_numbers = [13, 14, 15, 16, 17, 19, 20, 22, 23, 24]
+    bet_numbers = [13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]
     fibonacci_numbers = [1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584, 4181, 6765, 10946, 17711, 28657, 46368, 75025, 121393, 196418, 317811, 514229]
+    fibonacci_multiplier = 5
 
     fibonacci_tracker = 0
 
@@ -59,34 +75,50 @@ def game(rounds=50, start_balance=300):
     bet_history = []
 
     for i in range(rounds):
-        # if balance < 0 or (balance - start_balance) >= 300:
-        #     print("Condition met. Breaking")
-        #     break
+        if (balance - start_balance) >= goal:
+            print("Goal met. Stopping game")
+            break
 
         number = roulette_wheel.spin()
         # !!: If you are changing up the strategy revisit the math to make sure it is correct.
-        current_bet = fibonacci_numbers[fibonacci_tracker]
+        current_bet = fibonacci_numbers[fibonacci_tracker] * fibonacci_multiplier
+
+        # see if the player has enough to lose
+        lost = current_bet
+        if balance - lost < 0:
+            print("Uhh Ohh. You lost. Stopping game")
+            break
+
         bet_history.append(current_bet)
         if number in bet_numbers:
             #               chip on the number * 35                -    number of other chips on the board * the amount on the chip
-            balance += (current_bet * 35) - ((len(bet_numbers) - 1) * current_bet)
+            # balance += (current_bet * 35) - ((len(bet_numbers) - 1) * current_bet)            my 10 number strategy
+            balance += current_bet * 2
             fibonacci_tracker = 0
         else:
-            balance -= current_bet * len(bet_numbers)
+            # balance -= current_bet * len(bet_numbers)                                         my 10 number strategy
+            balance -= current_bet
             fibonacci_tracker += 1
 
         if balance > highest_balance[0]:
             highest_balance.update({i + 1: balance})
         balance_history.append(balance)
 
-    # print(roulette_wheel.get_history())
-    generate_graphs(roulette_wheel.get_history(), balance_history)
+    if data:
+        # print(roulette_wheel.get_history())
+        generate_graphs(roulette_wheel.get_history(), balance_history)
 
     if balance < 0:
-        return False
+        return 0
 
-    if balance >= start_balance:
-        return True
+    if 0 < balance < start_balance:
+        return 1
+
+    if start_balance < balance < goal:
+        return 2
+
+    elif (balance - start_balance) >= goal:
+        return 3
 
 
 #############################################################################################################
